@@ -1,0 +1,12 @@
+[package]
+name = "gsSaveGame"
+version = "1.0.0"
+edition = "2021"
+description = "CLI tool for encoding and decoding .gssg (GIANTS Software SaveGame) archive files used by Farming Simulator 20/23/25/26."
+
+[[bin]]
+name = "gsSaveGame"
+path = "src/main.rs"
+
+[dependencies]
+flate2 = "1"
