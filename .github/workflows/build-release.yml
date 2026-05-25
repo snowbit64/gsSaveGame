@@ -1,0 +1,58 @@
+name: Build & Release gsSaveGame
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: |
+            x86_64-pc-windows-gnu
+            aarch64-linux-android
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            mingw-w64 \
+            binutils
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+      - name: Configure Android toolchains
+        run: |
+          NDK=$ANDROID_NDK_HOME
+          mkdir -p .cargo
+          echo '[target.aarch64-linux-android]' > .cargo/config.toml
+          echo 'linker = "'$NDK'/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"' >> .cargo/config.toml
+      - name: Run tests
+        run: cargo test --bin gsSaveGame
+      - name: Build Windows
+        run: cargo build --release --bin gsSaveGame --target x86_64-pc-windows-gnu
+      - name: Build Android ARM64
+        run: cargo build --release --bin gsSaveGame --target aarch64-linux-android
+      - name: Prepare artifacts
+        run: |
+          mkdir -p dist
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF_NAME}
+          else
+            VERSION=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          fi
+          cp target/x86_64-pc-windows-gnu/release/gsSaveGame.exe "dist/gsSaveGame-${VERSION}-windows.exe"
+          cp target/aarch64-linux-android/release/gsSaveGame "dist/gsSaveGame-${VERSION}-android-arm64"
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
